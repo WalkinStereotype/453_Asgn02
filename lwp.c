@@ -41,7 +41,6 @@ tid_t lwp_create(lwpfun func, void *arg){
     //error checking for mmap call
     if(mmap == MAP_FAILED)
         return NO_THREAD; 
-<<<<<<< HEAD
 
     /* Initialize the stack frame and context so that when 
     that context is loaded in swap rfiles(),
@@ -68,7 +67,6 @@ tid_t lwp_create(lwpfun func, void *arg){
 
     /*admit the new thread into the scheduler*/
     lwp_get_scheduler()->admit(newThread);
-=======
 
     /* Initialize the stack frame and context so that when 
     that context is loaded in swap rfiles(),
@@ -111,14 +109,12 @@ void  lwp_yield(void){
      scheduler. Saves the current LWP’s context, picks the 
      next one, restores that thread’s context, and returns.
      If there is no next thread, terminates the program*/
->>>>>>> 8c3003f1fea63007077fa58c474b98677046441d
 }
 
 void  lwp_start(void){
     /*Starts the LWP system. Converts the calling thread 
     into a LWP and lwp yield()s to whichever thread
     the scheduler chooses.*/
-<<<<<<< HEAD
 
     /*TODO: conver calling thread into a LWP*/
 
@@ -186,7 +182,6 @@ tid_t lwp_gettid(void){
     if(lwp_get_scheduler()->next == NULL){
         return NO_THREAD;
     }
-=======
 }
 
 tid_t lwp_wait(int *status){
@@ -214,13 +209,11 @@ void  lwp_set_scheduler(scheduler fun){
 
 scheduler lwp_get_scheduler(void){
     /*Returns the pointer to the current scheduler.*/
->>>>>>> 8c3003f1fea63007077fa58c474b98677046441d
 }
 
 thread tid2thread(tid_t tid){
     /*Returns the thread corresponding to the given 
     threadID, or NULL if the ID is invalid*/
-<<<<<<< HEAD
 
     /*get the thread using ID*/
 
@@ -239,8 +232,6 @@ void  lwp_set_scheduler(scheduler sched){
 scheduler lwp_get_scheduler(void){
     /*Returns the pointer to the current scheduler.*/
     return currentSched;
-=======
->>>>>>> 8c3003f1fea63007077fa58c474b98677046441d
 }
 
 void swap_rfiles(rfile *old, rfile *new){
