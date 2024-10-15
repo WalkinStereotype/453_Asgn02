@@ -65,6 +65,9 @@ typedef struct scheduler {
   int    (*qlen)(void);            /* number of ready threads       */
 } *scheduler;
 
+/*Round Robin scheduler*/
+scheduler RoundRobin;
+
 /* lwp functions */
 extern tid_t lwp_create(lwpfun,void *);
 extern void  lwp_exit(int status);
@@ -72,7 +75,7 @@ extern tid_t lwp_gettid(void);
 extern void  lwp_yield(void);
 extern void  lwp_start(void);
 extern tid_t lwp_wait(int *);
-extern void  lwp_set_scheduler(scheduler fun);
+extern void  lwp_set_scheduler(scheduler sched);
 extern scheduler lwp_get_scheduler(void);
 extern thread tid2thread(tid_t tid);
 
