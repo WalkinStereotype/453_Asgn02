@@ -106,3 +106,6 @@ thread rrNext(void){
 int rrQLen(void){
     return q.size;
 }
+
+// struct scheduler rrPublish = {NULL, NULL, rrAdmit, rrRemove, rrNext, rrQLen};
+// scheduler RoundRobin = &rrPublish;
