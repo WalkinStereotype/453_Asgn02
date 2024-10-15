@@ -3,80 +3,68 @@
 
 #include "lwp.h"
 
-//Linked list node for threads
-typedef struct threadNode {
-    thread t;  
-    struct threadNode* next;
-} threadNode;
-
 //Linked list
 typedef struct rrQueue {
-    threadNode* head;
-    threadNode* tail;
+    thread head;
+    thread tail;
     int size;
 } rrQueue;
 
 //Global queue
 rrQueue q = {NULL, NULL, 0};
 
-// void addToQueue(rrQueue *queue, thread new){
-//     threadNode *newNode = (threadNode *) malloc(sizeof(threadNode));
 
-//     &newNode = {new, NULL};
-//     if (queue -> size == 0){
-//         queue -> head = newNode;
-//         queue -> tail = newNode;
-//     } else {
-//         queue -> tail -> next = newNode;
-//         queue -> tail = newNode;
-//     }
-
-//     queue -> size++;
-// }
-
-// void dequeue(rrQueue *queue){
-//     if( )
-// }
-
-//init and shutdown have null values
-
-//
+//Adds in a thread into the scheduler
 void rrAdmit(thread new){
-    threadNode *newNode = (threadNode *) malloc(sizeof(threadNode));
 
-    *newNode = (threadNode) {new, NULL};
+    //Ensure "next" pointer points to NULL 
+    //as it indicates the tail
+    new -> sched_one = NULL;
+
+    //If queue is empty, make new thread 
+    //both the head and tail
     if (q.size == 0){
-        q.head = newNode;
-        q.tail = newNode;
+        q.head = new;
+        q.tail = new;
     } else {
-        q.tail -> next = newNode;
-        q.tail = newNode;
+        //Else, add it to the end of the queue
+        q.tail -> sched_one = new;
+        q.tail = new;
     }
 
     q.size++;
 }
 
+
+//Removes a thread from the scheduler
 void rrRemove(thread victim){
 
-    if (q.head -> t == victim){
-        threadNode *nodeToRemove = q.head;
-        q.head = q.head -> next;
-        free(nodeToRemove); 
+    //If the thread is the head, 
+    //move head pointer to next thread 
+    //and decrement size
+    if (q.head == victim){
+        q.head = q.head -> sched_one;
         q.size--;
         return;
     } else {
-        threadNode *prevNode = q.head;
-        threadNode *currNode = q.head -> next;
-        while(currNode != NULL){
-            if(currNode -> t == victim){
-                threadNode *nodeToRemove = currNode;
-                prevNode -> next = currNode -> next;
-                free(nodeToRemove);
+
+        //Make pointers for the delinking process
+        thread prevThread = q.head;
+        thread currThread = q.head -> sched_one;
+
+        //Iterate through queue
+        while(currThread != NULL){
+
+            //If victim is found, delink it
+            if(currThread  == victim){
+                thread threadToRemove = currThread;
+                prevThread -> sched_one = currThread -> sched_one;
                 q.size--;
                 return;
             } else {
-                prevNode = currNode;
-                currNode = currNode -> next;
+                //Else, try next thread
+                prevThread = currThread;
+                currThread = currThread -> sched_one;
             }
         }
 
@@ -86,23 +74,38 @@ void rrRemove(thread victim){
     
 }
 
+//Return next thread to run, 
+//put it back in queue
 thread rrNext(void){
+
+    //If queue is empty return NULL
     if (q.head == NULL){
         return NULL;
     }
+
+    //If there is only one,
+    //return thread, do nothing more
     if (q.size == 1){
-        return q.head -> t;
+        return q.head;
     }
 
-    threadNode *newHead = q.head -> next; 
-    q.tail -> next = q.head;
+    //Move thread to the back 
+    //Update head pointer
+    //Return appropriate thread
+    thread newHead = q.head -> sched_one; 
+    q.tail -> sched_one = q.head;
     q.tail = q.head;
     q.head = newHead;
 
-    return q.tail -> t;
+    return q.tail;
 
 }
 
+
+//Return length of queue
 int rrQLen(void){
     return q.size;
 }
+
+// struct scheduler rrPublish = {NULL, NULL, rrAdmit, rrRemove, rrNext, rrQLen};
+// scheduler RoundRobin = &rrPublish;
