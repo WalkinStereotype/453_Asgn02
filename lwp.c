@@ -94,11 +94,6 @@ tid_t lwp_create(lwpfun func, void *arg){
     newThread -> tid;
 }
 
-tid_t lwp_gettid(void){
-    /*Returns the tid of the calling LWP
-     or NOTHREAD if not called by a LWP*/
-}
-
 void  lwp_start(void){
     /*Starts the LWP system. Converts the calling thread 
     into a LWP and lwp yield()s to whichever thread
@@ -229,33 +224,6 @@ tid_t lwp_gettid(void){
     }
 }
 
-tid_t lwp_wait(int *status){
-    /*Waits for a thread to terminate, deallocates its 
-    resources, and reports its termination status if 
-    status is non-NULL. Returns the tid of the terminated
-    thread or NOTHREAD.*/
-
-
-    /*check for terminated threads and return them in FIFO order*/
-
-    /*if there are no terminated threads block by descheduling
-    it and place it on a queue of waiting threads*/
-
-    /*if qlen is not greater than one then return NO-THREAD*/
-}
-
-void  lwp_set_scheduler(scheduler fun){
-    /* Causes the LWP package to use the given scheduler
-    to choose the next process to run. Transfers all 
-    threads from the old scheduler to the new one in next()
-     order. If scheduler is NULL the library should return 
-     to round-robin scheduling.*/
-}
-
-scheduler lwp_get_scheduler(void){
-    /*Returns the pointer to the current scheduler.*/
-}
-
 thread tid2thread(tid_t tid){
     /*Returns the thread corresponding to the given 
     threadID, or NULL if the ID is invalid*/
@@ -271,14 +239,13 @@ void  lwp_set_scheduler(scheduler sched){
     threads from the old scheduler to the new one in next()
      order. If scheduler is NULL the library should return 
      to round-robin scheduling.*/
-    
+}
+
+scheduler lwp_get_scheduler(void){
+    /*Returns the pointer to the current scheduler.*/
 }
 
 scheduler lwp_get_scheduler(void){
     /*Returns the pointer to the current scheduler.*/
     return currentSched;
-}
-
-void swap_rfiles(rfile *old, rfile *new){
-
 }
