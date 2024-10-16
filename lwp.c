@@ -156,21 +156,55 @@ void  lwp_exit(int status){
     //does not return
 }
 
+/*Waits for a thread to terminate, deallocates its 
+ resources, and reports its termination status if 
+ status is non-NULL. Returns the tid of the terminated
+ thread or NO_THREAD.*/
 tid_t lwp_wait(int *status){
-    /*Waits for a thread to terminate, deallocates its 
-    resources, and reports its termination status if 
-    status is non-NULL. Returns the tid of the terminated
-    thread or NOTHREAD.*/
-
-
     /*check for terminated threads in list of exited threads
     and return them in FIFO order*/
-
+    //TODO check exited for a thread and return the tid of it
     /*if there are no terminated threads block by descheduling
     it and place it on a queue of waiting threads*/
+    
+    if(exitedHead->exited == NULL){
+        /*nothing is waiting or has exited*/
+        currentSched->remove(currentThread);
+        exitedHead->exited = currentThread;
+        exitedHead->status = LWP_LIVE;
+        lwp_yield();
+    } else if(exitedHead->status == LWP_LIVE){
+        /*other lwps are waiting, add to end of waiting queue
+        then deschedule*/
+        thread temp = exitedHead;
+        while(temp->exited != NULL){
+            temp = temp->exited;
+        }
+        /*adds waiting thread to end of the queue*/
+        temp->exited = currentThread;
 
+        currentSched->remove(currentThread);
+        exitedHead->exited = currentThread;
+        exitedHead->status = LWP_LIVE;
+        lwp_yield();
+    } else {
+        /*exited lwp(s) are on queue. deallocates resources of exited thread
+        and reports its termination status if non-NULL
+        returns tid of terminated thread*/
+        thread termThread = exitedHead->exited;
+        exitedHead->exited = exitedHead->exited->exited;
+        if (exitedHead->exited == NULL){
+            /*setting status to null since queue is empty*/
+            exitedHead->status = NULL; 
+        }
+        munmap(termThread->stack, termThread->stacksize);
+        //TODO report termination status if non-NULL
+        status = termThread->status;
+        return termThread->tid;
+
+    }
     /*if qlen is not greater than one then return NO_THREAD*/
-    if(lwp_get_scheduler()->qlen <= 1){
+    if(currentSched->qlen <= 1){
         return NO_THREAD;
     }
 }
