@@ -94,21 +94,9 @@ tid_t lwp_create(lwpfun func, void *arg){
     newThread -> tid;
 }
 
-void  lwp_exit(int status){
-    /*Terminates the current LWP and yields to whichever
-     thread the scheduler chooses. lwpexit() does not return*/
-}
-
 tid_t lwp_gettid(void){
     /*Returns the tid of the calling LWP
      or NOTHREAD if not called by a LWP*/
-}
-
-void  lwp_yield(void){
-    /*Yields control to another LWP.Which one depends on the
-     scheduler. Saves the current LWP’s context, picks the 
-     next one, restores that thread’s context, and returns.
-     If there is no next thread, terminates the program*/
 }
 
 void  lwp_start(void){
@@ -138,22 +126,44 @@ void  lwp_yield(void){
     currentThread = nextThread;
 }
 
+/*Terminates the current LWP and yields to whichever
+ thread the scheduler chooses. lwpexit() does not return*/
 void  lwp_exit(int status){
-    /*Terminates the current LWP and yields to whichever
-     thread the scheduler chooses. lwpexit() does not return*/
-
-    scheduler sched = lwp_get_scheduler();
 
     /*remove current LWP*/
-    //TODO: add victim to remove sched->remove();
-    sched->remove(currentThread);
+    /*remove current thread from scheduler*/
+    currentSched->remove(currentThread);
+    
+    /*update status*/
+    currentThread->status = LWP_TERM;
+    /*TODO: check if any threads are waiting*/
+    if(exitedHead->exited == NULL){
+        /*nothing is waiting or has exited*/
+        exitedHead->exited = currentThread;
+        exitedHead->status = LWP_TERM;
+    } else if(exitedHead->status == LWP_LIVE){
+        /*other lwp(s) are waiting, match with first waiting lwp*/
+        thread waitThread = exitedHead->exited; //first waiting thread
+        //remove thread from list
+        exitedHead->exited = exitedHead->exited->exited;
+        waitThread->exited = NULL; //reset exited now that lwp is remove
+        if (exitedHead->exited == NULL){
+            /*setting status to null since queue is empty*/
+            exitedHead->status = NULL; 
+        }
+        currentSched->admit(waitThread); //readmit waiting thread
+    } else {
+        /*exited lwp(s) are on queue, add current to the end */
+        thread temp = exitedHead;
+        while(temp->exited != NULL){
+            temp = temp->exited;
+        }
+        /*adds waiting thread to end of the queue*/
+        temp->exited = currentThread;
+    }
 
     /*swap to the next LWP */
-    //TODO: currentContext =
-    thread nextThread = sched->next;
-    //swap exited lwp state with next State
-    swap_rfiles(&currentThread->state, &nextThread->state)
-    //does not return
+    lwp_yield();
 }
 
 /*Waits for a thread to terminate, deallocates its 
@@ -182,10 +192,7 @@ tid_t lwp_wait(int *status){
         }
         /*adds waiting thread to end of the queue*/
         temp->exited = currentThread;
-
         currentSched->remove(currentThread);
-        exitedHead->exited = currentThread;
-        exitedHead->status = LWP_LIVE;
         lwp_yield();
     } else {
         /*exited lwp(s) are on queue. deallocates resources of exited thread
