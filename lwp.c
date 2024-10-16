@@ -8,6 +8,9 @@
 #include "roundRobinScheduler.c"
 
 #define STACK_SIZE 16384
+#define PREV_THREAD lib_one
+#define NEXT_THREAD lib_two
+#define EXITED_NEXT exited
 
 /*initialize scheduler (global)*/
 scheduler currentSched = RoundRobin;
@@ -15,6 +18,10 @@ scheduler currentSched = RoundRobin;
 thread currentThread = NULL;
 /*threadID counter*/
 tid_t threadCounter = 0;
+/* threadHead and threadTail for doubly linked list */
+/* Used for switching between tid and thread */
+thread runningHead = NULL;
+thread runningTail = NULL;
 
 
 
@@ -54,6 +61,23 @@ tid_t lwp_create(lwpfun func, void *arg){
     /*set tid to the current counter value then increment the counter*/
     newThread -> tid = ++threadCounter;
 
+    /*TODO: initialize lib_one and two and sched_one and two if needed*/
+    if(threadCounter == 1){
+        //Initialize list
+        runningHead = newThread;
+        runningTail = newThread;
+
+        //Set prev and next pointers
+        newThread -> PREV_THREAD = NULL;
+        newThread -> NEXT_THREAD = NULL;
+    } else {
+
+        //Else, update the tail
+        runningTail -> NEXT_THREAD = newThread;
+        newThread -> PREV_THREAD = runningTail;
+        runningTail = newThread;
+    }
+
     //Initialize thread's status
     newThread -> status = LWP_LIVE;
 
@@ -83,8 +107,6 @@ tid_t lwp_create(lwpfun func, void *arg){
     newThread -> state.fxsave = FPU_INIT;
 
 
-    /*TODO: initialize lib_one and two and sched_one and two if needed*/
-
     /*TODO: initialize exited if needed*/
 
     /*admit the new thread into the scheduler*/
@@ -94,22 +116,6 @@ tid_t lwp_create(lwpfun func, void *arg){
     newThread -> tid;
 }
 
-void  lwp_exit(int status){
-    /*Terminates the current LWP and yields to whichever
-     thread the scheduler chooses. lwpexit() does not return*/
-}
-
-tid_t lwp_gettid(void){
-    /*Returns the tid of the calling LWP
-     or NOTHREAD if not called by a LWP*/
-}
-
-void  lwp_yield(void){
-    /*Yields control to another LWP.Which one depends on the
-     scheduler. Saves the current LWP’s context, picks the 
-     next one, restores that thread’s context, and returns.
-     If there is no next thread, terminates the program*/
-}
 
 void  lwp_start(void){
     /*Starts the LWP system. Converts the calling thread 
@@ -172,52 +178,47 @@ tid_t lwp_wait(int *status){
 }
 
 tid_t lwp_gettid(void){
-    /*Returns the tid of the calling LWP
-     or NO_THREAD if not called by a LWP*/
-    
-    /*return tid of LWP*/
 
-    /*return NO_THREAD if not called by a LWP
-    (sched->next returns null)*/
-    if(lwp_get_scheduler()->next == NULL){
+    //If there is no current thread then return NO_THREAD
+    if (currentThread == NULL){
         return NO_THREAD;
+    } else {
+        //Else return currentThread's id
+        return currentThread -> tid;
     }
-}
 
-tid_t lwp_wait(int *status){
-    /*Waits for a thread to terminate, deallocates its 
-    resources, and reports its termination status if 
-    status is non-NULL. Returns the tid of the terminated
-    thread or NOTHREAD.*/
-
-
-    /*check for terminated threads and return them in FIFO order*/
-
-    /*if there are no terminated threads block by descheduling
-    it and place it on a queue of waiting threads*/
-
-    /*if qlen is not greater than one then return NO-THREAD*/
-}
-
-void  lwp_set_scheduler(scheduler fun){
-    /* Causes the LWP package to use the given scheduler
-    to choose the next process to run. Transfers all 
-    threads from the old scheduler to the new one in next()
-     order. If scheduler is NULL the library should return 
-     to round-robin scheduling.*/
-}
-
-scheduler lwp_get_scheduler(void){
-    /*Returns the pointer to the current scheduler.*/
 }
 
 thread tid2thread(tid_t tid){
-    /*Returns the thread corresponding to the given 
-    threadID, or NULL if the ID is invalid*/
 
-    /*get the thread using ID*/
+    //Quick checks to see if tid is invalid
+    if((tid <= 0) 
+        || (tid >= threadCounter)
+        || (runningHead == NULL)){
 
-    /*if ID is invalid return null*/
+        return NULL;
+
+    }
+
+    //Iterator for the while loop
+    thread threadIterator = runningHead;
+
+    //While not at the end of the list
+    while(threadIterator != NULL){
+
+        //If we found the tid, return the thread
+        if(threadIterator -> tid == tid){
+            return threadIterator;
+        }
+
+        //Iterate to next
+        threadIterator = threadIterator -> NEXT_THREAD;
+    }
+
+    //If we got this far, return NULL
+    return NULL;
+
+
 }
 
 void  lwp_set_scheduler(scheduler sched){
@@ -234,6 +235,3 @@ scheduler lwp_get_scheduler(void){
     return currentSched;
 }
 
-void swap_rfiles(rfile *old, rfile *new){
-
-}
