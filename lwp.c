@@ -10,7 +10,7 @@
 #define STACK_SIZE 16384
 
 /*initialize scheduler (global)*/
-scheduler currentSched = &RoundRobin;
+scheduler currentSched = RoundRobin;
 /*global pointer to current thread*/
 thread currentThread = NULL;
 /*threadID counter*/
@@ -50,24 +50,38 @@ tid_t lwp_create(lwpfun func, void *arg){
     it will properly return to the lwp’s function with 
     the stack and registers arranged as it will expect*/
 
-    // context newContext; /*create new context*/
 
-    // /*TODO: set tid to the current counter value then increment the counter*/
-    // newContext.tid;
+    /*set tid to the current counter value then increment the counter*/
+    newThread -> tid = ++threadCounter;
 
-    // /*set stack to new stack initialized*/
-    // newContext.stack = newStack; 
+    //Initialize thread's status
+    newThread -> status = LWP_LIVE;
 
-    // /*sets context stacksize to size of stack*/
-    // newContext.stacksize = STACK_SIZE; 
-
-    newThread -> tid = threadCounter++;
+    /*set stack to new stack initialized*/
     *(newThread -> stack) = newStack;
 
+    /*sets context stacksize to size of stack*/
+    newThread -> stacksize = STACK_SIZE; 
+
+ 
+    /*set state to what it needs to be*/
 
 
-    // newContext.state. 
-    /*TODO: set state to what it needs to be*/
+    //Load argument into rdi register
+    newThread -> state.rdi = *((unsigned long *) arg);
+
+    //Threads are never called, so no old RBP or return address
+    //So rbp = rsp 
+    unsigned long topOfStack = 
+        (unsigned long)((newThread -> stack) 
+        + (newThread -> stacksize));
+
+    newThread -> state.rbp = topOfStack;
+    newThread -> state.rsp = topOfStack;
+
+    //Initialize FPU
+    newThread -> state.fxsave = FPU_INIT;
+
 
     /*TODO: initialize lib_one and two and sched_one and two if needed*/
 
@@ -75,6 +89,9 @@ tid_t lwp_create(lwpfun func, void *arg){
 
     /*admit the new thread into the scheduler*/
     lwp_get_scheduler() -> admit(newThread);
+
+    // Return thread id
+    newThread -> tid;
 }
 
 void  lwp_exit(int status){
