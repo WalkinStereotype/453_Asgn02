@@ -127,11 +127,15 @@ void  lwp_yield(void){
      next one, restores that thread’s context, and returns.
      If there is no next thread, terminates the program*/
 
-    /*yield to LWP returned by lwp_get_scheduler()->next*/
-    /*TODO: set currentThread = next*/
-
     /*if no next thread exit(3) with termination status of LWP*/
-    //TODO exit()
+    thread nextThread = lwp_get_scheduler()->next;
+    if(nextThread == NULL){
+        exit(currentThread->status); //TODO exit with correct status
+    }
+    
+    /*yield to LWP returned by lwp_get_scheduler()->next*/
+    swap_rfiles(&currentThread->state, &nextThread->state);
+    currentThread = nextThread;
 }
 
 void  lwp_exit(int status){
