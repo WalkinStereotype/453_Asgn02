@@ -5,6 +5,7 @@
 #include <unistd.h>
 
 #include "lwp.h"
+#include "roundRobinScheduler.c"
 
 #define STACK_SIZE 16384
 
@@ -12,6 +13,8 @@
 scheduler currentSched = &RoundRobin;
 /*global pointer to current thread*/
 thread currentThread = NULL;
+/*threadID counter*/
+tid_t threadCounter = 0;
 
 
 
@@ -21,7 +24,7 @@ thread currentThread = NULL;
 tid_t lwp_create(lwpfun func, void *arg){
     
     //Allocate memory for new context
-    thread newThread = malloc(sizeof(thread));
+    thread newThread = (thread) malloc(sizeof(context));
     //Check if allocation fails
     if(newThread == NULL){
         return NO_THREAD;
@@ -47,16 +50,21 @@ tid_t lwp_create(lwpfun func, void *arg){
     it will properly return to the lwp’s function with 
     the stack and registers arranged as it will expect*/
 
-    context newContext; /*create new context*/
+    // context newContext; /*create new context*/
 
-    /*TODO: set tid to the current counter value then increment the counter*/
-    newContext.tid;
+    // /*TODO: set tid to the current counter value then increment the counter*/
+    // newContext.tid;
 
-    /*set stack to new stack initialized*/
-    newContext.stack = newStack; 
+    // /*set stack to new stack initialized*/
+    // newContext.stack = newStack; 
 
-    /*sets context stacksize to size of stack*/
-    newContext.stacksize = STACK_SIZE; 
+    // /*sets context stacksize to size of stack*/
+    // newContext.stacksize = STACK_SIZE; 
+
+    newThread -> tid = threadCounter++;
+    *(newThread -> stack) = newStack;
+
+
 
     // newContext.state. 
     /*TODO: set state to what it needs to be*/
@@ -66,32 +74,7 @@ tid_t lwp_create(lwpfun func, void *arg){
     /*TODO: initialize exited if needed*/
 
     /*admit the new thread into the scheduler*/
-    lwp_get_scheduler()->admit(newThread);
-
-    /* Initialize the stack frame and context so that when 
-    that context is loaded in swap rfiles(),
-    it will properly return to the lwp’s function with 
-    the stack and registers arranged as it will expect*/
-
-    context newContext; /*create new context*/
-
-    /*TODO: set tid to the current counter value then increment the counter*/
-    newContext.tid;
-
-    /*set stack to new stack initialized*/
-    newContext.stack = newStack; 
-
-    /*sets context stacksize to size of stack*/
-    newContext.stacksize = STACK_SIZE; 
-
-    newContext.state; /*TODO: set state to what it needs to be*/
-
-    /*TODO: initialize lib_one and two and sched_one and two if needed*/
-
-    /*TODO: initialize exited if needed*/
-
-    /*admit the new thread into the scheduler*/
-    rradmit(newThread);
+    lwp_get_scheduler() -> admit(newThread);
 }
 
 void  lwp_exit(int status){
