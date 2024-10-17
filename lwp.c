@@ -29,6 +29,15 @@ thread exitedHead = NULL;
 
 /* lwp functions */
 
+static void lwp_wrap(lwpfun fun, void *arg) {
+    /* Call the given lwpfunction with the given argument.
+    * Calls lwp exit() with its return value
+    */
+    int rval;
+    rval = fun(arg);
+    lwp_exit(rval);
+}
+
 tid_t lwp_create(lwpfun func, void *arg){
     //Allocate memory for new context
     thread newThread = (thread) malloc(sizeof(context));
@@ -90,14 +99,10 @@ tid_t lwp_create(lwpfun func, void *arg){
  
 
     /* set state to what it needs to be */
-
-    //Load argument into rdi register
-    newThread -> state.rdi = *((unsigned long *) arg);
-
     //Threads are never called, so 
     // RBP and return address are not needed
     unsigned long topOfStack = 
-        (unsigned long)((newThread -> stack) 
+        (unsigned long)((unsigned long)(newThread -> stack) 
         + (newThread -> stacksize));
 
     //Ensure it is aligned by 16
@@ -107,8 +112,9 @@ tid_t lwp_create(lwpfun func, void *arg){
     //Put function as return address
     unsigned long *topPointer = (unsigned long *)topOfStack;
     topPointer--;
-    *topPointer = (unsigned long)func;
 
+    *topPointer = (unsigned long)lwp_wrap;
+    
     //Put a filler base pointer
     topPointer--;
     *topPointer = 127;
@@ -116,6 +122,9 @@ tid_t lwp_create(lwpfun func, void *arg){
     //Set rbp and rsp
     newThread -> state.rbp = topOfStack;
     newThread -> state.rsp = topOfStack;
+    newThread -> state.rdi = func;
+    newThread -> state.rsi = arg;
+
 
 
     //Initialize FPU
@@ -134,11 +143,22 @@ tid_t lwp_create(lwpfun func, void *arg){
 
 
 void  lwp_start(void){
+    //printf"\n in start");
     /*Starts the LWP system. Converts the calling thread 
     into a LWP and lwp yield()s to whichever thread
     the scheduler chooses.*/
 
     /*TODO: conver calling thread into a LWP*/
+    thread newThread = (thread) malloc(sizeof(context));
+    newThread -> tid = ++threadCounter;
+    newThread -> status = LWP_LIVE;
+
+    lwp_get_scheduler()->admit(newThread);
+    //Check if allocation fails
+    if(newThread == NULL){
+        return NO_THREAD;
+    }
+
 
     /*yeild to next thread*/
     lwp_yield();
@@ -146,6 +166,7 @@ void  lwp_start(void){
 }
 
 void  lwp_yield(void){
+    //printf"\nin yield");
     /*Yields control to another LWP.Which one depends on the
      scheduler. Saves the current LWP’s context, picks the 
      next one, restores that thread’s context, and returns.
@@ -156,16 +177,16 @@ void  lwp_yield(void){
 
     /*if no next thread exit(3) with termination status of LWP*/
     thread nextThread = lwp_get_scheduler()->next();
-    printf("got next\n");
-    if(&nextThread == NULL){
-        printf("exiting1");
-        exit(1);
+    //printf"got next\n");
+    if(nextThread == NULL){
+        //printf"exiting1");
         exit(currentThread->status); //TODO exit with correct status
     }
-    printf("not exiting");
+    //printf"not exiting");
+    // exit(1);
     /*yield to LWP returned by lwp_get_scheduler()->next*/
     swap_rfiles(&currentThread->state, &nextThread->state);
-    printf("rfiles swaped");
+    //printf"rfiles swaped");
     
     exit(1);
     currentThread = nextThread;
@@ -197,10 +218,6 @@ void  lwp_exit(int status){
         //remove thread from list
         exitedHead->exited = exitedHead->exited->exited;
         waitThread->exited = NULL; //reset exited now that lwp is remove
-        if (exitedHead->exited == NULL){
-            /*setting status to null since queue is empty*/
-            exitedHead->status = NULL; 
-        }
         lwp_get_scheduler()->admit(waitThread); //readmit waiting thread
     } else {
         /*exited lwp(s) are on queue, add current to the end */
@@ -216,7 +233,11 @@ void  lwp_exit(int status){
     //TODO: currentContext =
     thread nextThread = sched -> next();
     //swap exited lwp state with next State
-    swap_rfiles(&currentThread->state, &nextThread->state)
+    if(currentThread == NULL){
+        swap_rfiles(NULL, &nextThread->state);
+    }else {
+        swap_rfiles(&currentThread->state, &nextThread->state);
+    }
     //does not return
 }
 
@@ -257,13 +278,9 @@ tid_t lwp_wait(int *status){
         returns tid of terminated thread*/
         thread termThread = exitedHead->exited;
         exitedHead->exited = exitedHead->exited->exited;
-        if (exitedHead->exited == NULL){
-            /*setting status to null since queue is empty*/
-            exitedHead->status = NULL; 
-        }
         munmap(termThread->stack, termThread->stacksize);
         //TODO report termination status if non-NULL
-        status = termThread->status;
+        *status = termThread->status;
         return termThread->tid;
 
     }
@@ -271,15 +288,6 @@ tid_t lwp_wait(int *status){
     if(lwp_get_scheduler() -> qlen() <= 1){
         return NO_THREAD;
     }
-}
-
-static void lwp_wrap(lwpfun fun, void *arg) {
-    /* Call the given lwpfunction with the given argument.
-    * Calls lwp exit() with its return value
-    */
-    int rval;
-    rval = fun(arg);
-    lwp_exit(rval);
 }
 
 tid_t lwp_gettid(void){
@@ -292,14 +300,6 @@ tid_t lwp_gettid(void){
         return currentThread -> tid;
     }
 
-}
-
-static void lwp_wrap(lwpfun func, void *arg){
-    //Call the lwpfunction with the given argument
-    int rval = func(arg);
-
-    //Call lwp_exit
-    lwp_exit(rval);
 }
 
 thread tid2thread(tid_t tid){
