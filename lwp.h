@@ -66,7 +66,7 @@ typedef struct scheduler {
 } *scheduler;
 
 /*Round Robin scheduler*/
-scheduler RoundRobin;
+extern scheduler rrPublish;
 
 /* lwp functions */
 extern tid_t lwp_create(lwpfun,void *);

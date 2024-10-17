@@ -13,7 +13,7 @@
 #define EXITED_NEXT exited
 
 /*initialize scheduler (global)*/
-scheduler currentSched = RoundRobin;
+scheduler currentSched = &rrPublish;
 /*global pointer to current thread*/
 thread currentThread = NULL;
 /*threadID counter*/
@@ -22,6 +22,7 @@ tid_t threadCounter = 0;
 /* Used for switching between tid and thread */
 thread runningHead = NULL;
 thread runningTail = NULL;
+thread exitedHead = NULL;
 
 
 
@@ -29,7 +30,6 @@ thread runningTail = NULL;
 /* lwp functions */
 
 tid_t lwp_create(lwpfun func, void *arg){
-    
     //Allocate memory for new context
     thread newThread = (thread) malloc(sizeof(context));
     //Check if allocation fails
@@ -49,9 +49,9 @@ tid_t lwp_create(lwpfun func, void *arg){
             MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, 
             -1, 0);
     //error checking for mmap call
+
     if(mmap == MAP_FAILED)
         return NO_THREAD; 
-
     /* Initialize the stack frame and context so that when 
     that context is loaded in swap rfiles(),
     it will properly return to the lwp’s function with 
@@ -82,18 +82,15 @@ tid_t lwp_create(lwpfun func, void *arg){
     newThread -> status = LWP_LIVE;
 
     /*set stack to new stack initialized*/
-    *(newThread -> stack) = newStack;
-
+    newThread -> stack = newStack;
     /*sets context stacksize to size of stack*/
     newThread -> stacksize = STACK_SIZE; 
-
  
     /*set state to what it needs to be*/
 
 
     //Load argument into rdi register
-    newThread -> state.rdi = *((unsigned long *) arg);
-
+    newThread -> state.rdi = (unsigned long) arg; //TODO update
     //Threads are never called, so no old RBP or return address
     //So rbp = rsp 
     unsigned long topOfStack = 
@@ -102,6 +99,7 @@ tid_t lwp_create(lwpfun func, void *arg){
 
     newThread -> state.rbp = topOfStack;
     newThread -> state.rsp = topOfStack;
+    newThread -> state.rdi = func;
 
     //Initialize FPU
     newThread -> state.fxsave = FPU_INIT;
@@ -113,11 +111,12 @@ tid_t lwp_create(lwpfun func, void *arg){
     lwp_get_scheduler() -> admit(newThread);
 
     // Return thread id
-    newThread -> tid;
+    return newThread -> tid;
 }
 
 
 void  lwp_start(void){
+    printf("\ninstart");
     /*Starts the LWP system. Converts the calling thread 
     into a LWP and lwp yield()s to whichever thread
     the scheduler chooses.*/
@@ -125,23 +124,33 @@ void  lwp_start(void){
     /*TODO: conver calling thread into a LWP*/
 
     /*yeild to next thread*/
+    lwp_yield();
+    return;
 }
 
 void  lwp_yield(void){
+    printf("\nin yield");
     /*Yields control to another LWP.Which one depends on the
      scheduler. Saves the current LWP’s context, picks the 
      next one, restores that thread’s context, and returns.
      If there is no next thread, terminates the program*/
 
     /*if no next thread exit(3) with termination status of LWP*/
-    thread nextThread = lwp_get_scheduler()->next;
-    if(nextThread == NULL){
+    thread nextThread = lwp_get_scheduler()->next();
+    printf("got next\n");
+    if(&nextThread == NULL){
+        printf("exiting1");
+        exit(1);
         exit(currentThread->status); //TODO exit with correct status
     }
-    
+    printf("not exiting");
     /*yield to LWP returned by lwp_get_scheduler()->next*/
     swap_rfiles(&currentThread->state, &nextThread->state);
+    printf("rfiles swaped");
+    
+    exit(1);
     currentThread = nextThread;
+    return;
 }
 
 /*Terminates the current LWP and yields to whichever
@@ -150,7 +159,7 @@ void  lwp_exit(int status){
 
     /*remove current LWP*/
     /*remove current thread from scheduler*/
-    currentSched->remove(currentThread);
+    lwp_get_scheduler()->remove(currentThread);
     
     /*update status*/
     currentThread->status = LWP_TERM;
@@ -169,7 +178,7 @@ void  lwp_exit(int status){
             /*setting status to null since queue is empty*/
             exitedHead->status = NULL; 
         }
-        currentSched->admit(waitThread); //readmit waiting thread
+        lwp_get_scheduler()->admit(waitThread); //readmit waiting thread
     } else {
         /*exited lwp(s) are on queue, add current to the end */
         thread temp = exitedHead;
@@ -197,7 +206,7 @@ tid_t lwp_wait(int *status){
     
     if(exitedHead->exited == NULL){
         /*nothing is waiting or has exited*/
-        currentSched->remove(currentThread);
+        lwp_get_scheduler()->remove(currentThread);
         exitedHead->exited = currentThread;
         exitedHead->status = LWP_LIVE;
         lwp_yield();
@@ -210,7 +219,7 @@ tid_t lwp_wait(int *status){
         }
         /*adds waiting thread to end of the queue*/
         temp->exited = currentThread;
-        currentSched->remove(currentThread);
+        lwp_get_scheduler()->remove(currentThread);
         lwp_yield();
     } else {
         /*exited lwp(s) are on queue. deallocates resources of exited thread
@@ -229,9 +238,18 @@ tid_t lwp_wait(int *status){
 
     }
     /*if qlen is not greater than one then return NO_THREAD*/
-    if(currentSched->qlen <= 1){
+    if(lwp_get_scheduler()->qlen() <= 1){
         return NO_THREAD;
     }
+}
+
+static void lwp_wrap(lwpfun fun, void *arg) {
+    /* Call the given lwpfunction with the given argument.
+    * Calls lwp exit() with its return value
+    */
+    int rval;
+    rval = fun(arg);
+    lwp_exit(rval);
 }
 
 tid_t lwp_gettid(void){
@@ -284,9 +302,21 @@ void  lwp_set_scheduler(scheduler sched){
     threads from the old scheduler to the new one in next()
      order. If scheduler is NULL the library should return 
      to round-robin scheduling.*/
+    
+    if(sched == NULL){
+        currentSched = RoundRobin;
+    }
+    while(lwp_get_scheduler()->next != NULL){
+        
+    }
+    
 }
 
 scheduler lwp_get_scheduler(void){
     /*Returns the pointer to the current scheduler.*/
+    if(currentSched == NULL){
+        return RoundRobin;
+    }
     return currentSched;
 }
+
