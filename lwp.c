@@ -22,7 +22,7 @@ tid_t threadCounter = 0;
 /* Used for switching between tid and thread */
 thread runningHead = NULL;
 thread runningTail = NULL;
-thread exitedHead = NULL;
+thread exitedHead;
 
 
 
@@ -143,7 +143,7 @@ tid_t lwp_create(lwpfun func, void *arg){
 
 
 void  lwp_start(void){
-    //printf"\n in start");
+    ////printf"\n in start");
     /*Starts the LWP system. Converts the calling thread 
     into a LWP and lwp yield()s to whichever thread
     the scheduler chooses.*/
@@ -152,6 +152,7 @@ void  lwp_start(void){
     thread newThread = (thread) malloc(sizeof(context));
     newThread -> tid = ++threadCounter;
     newThread -> status = LWP_LIVE;
+    newThread -> stack = NULL;
 
     lwp_get_scheduler()->admit(newThread);
     //Check if allocation fails
@@ -166,7 +167,7 @@ void  lwp_start(void){
 }
 
 void  lwp_yield(void){
-    //printf"\nin yield");
+    ////printf"\nin yield");
     /*Yields control to another LWP.Which one depends on the
      scheduler. Saves the current LWP’s context, picks the 
      next one, restores that thread’s context, and returns.
@@ -177,18 +178,34 @@ void  lwp_yield(void){
 
     /*if no next thread exit(3) with termination status of LWP*/
     thread nextThread = lwp_get_scheduler()->next();
-    //printf"got next\n");
+    //printf("got next\n");
     if(nextThread == NULL){
-        //printf"exiting1");
+        //printf("exiting1");
         exit(currentThread->status); //TODO exit with correct status
     }
-    //printf"not exiting");
-    // exit(1);
+    //printf("not exiting");
     /*yield to LWP returned by lwp_get_scheduler()->next*/
-    swap_rfiles(&currentThread->state, &nextThread->state);
-    //printf"rfiles swaped");
-    
-    exit(1);
+    //printf("here0");
+    // //printf("swapping(%p and %p)"
+    // ,(&currentThread->state, &nextThread->state));
+    // exit(1);
+    swap_rfiles(NULL, NULL);
+    rfile *old;
+    rfile *new;
+    if(currentThread == NULL || currentThread->stack == NULL){
+        old = NULL;
+    } else {
+        old = &currentThread->state;
+    }
+    if(nextThread == NULL || nextThread->stack == NULL){
+        new = NULL;
+    } else {
+        new = &nextThread->state;
+    }
+    swap_rfiles(old, new);
+    ////printf"rfiles swaped");
+    //printf("exited after swaprfiles");
+    // exit(1);
     currentThread = nextThread;
     return;
 }
@@ -208,6 +225,13 @@ void  lwp_exit(int status){
     /*update status*/
     currentThread->status = LWP_TERM;
     /*TODO: check if any threads are waiting*/
+    if(exitedHead == NULL){
+        struct threadinfo_st exitedHeadInit;
+        exitedHeadInit.tid = -1;
+        exitedHeadInit.exited = NULL;
+        exitedHead = &exitedHeadInit;
+    }
+
     if(exitedHead->exited == NULL){
         /*nothing is waiting or has exited*/
         exitedHead->exited = currentThread;
@@ -230,14 +254,20 @@ void  lwp_exit(int status){
     }
 
     /*swap to the next LWP */
+    lwp_yield();
     //TODO: currentContext =
-    thread nextThread = sched -> next();
-    //swap exited lwp state with next State
-    if(currentThread == NULL){
-        swap_rfiles(NULL, &nextThread->state);
-    }else {
-        swap_rfiles(&currentThread->state, &nextThread->state);
-    }
+    // thread nextThread = sched -> next();
+    // //swap exited lwp state with next State
+    // if(currentThread == NULL){
+    //     //printf("here1");
+    //     //printf("\nswapping(NULL and %p)", &nextThread->state);
+    //     swap_rfiles(NULL, &nextThread->state);
+    // }else {
+    //     //printf("\nhere2");
+    //     //printf("\nswapping(%p and %p)",
+    //     //  (&currentThread->state, &nextThread->state));
+    //     swap_rfiles(&currentThread->state, &nextThread->state);
+    // }
     //does not return
 }
 
@@ -283,7 +313,7 @@ tid_t lwp_wait(int *status){
         *status = termThread->status;
         return termThread->tid;
 
-    }
+    }   
     /*if qlen is not greater than one then return NO_THREAD*/
     if(lwp_get_scheduler() -> qlen() <= 1){
         return NO_THREAD;
