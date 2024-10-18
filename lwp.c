@@ -11,6 +11,7 @@
 #define PREV_THREAD lib_one
 #define NEXT_THREAD lib_two
 #define EXITED_NEXT exited
+#define NO_EXIT_VALUE 0
 
 /*initialize scheduler (global)*/
 scheduler currentSched = &rrPublish;
@@ -33,15 +34,6 @@ static void lwp_wrap(lwpfun func, void *arg){
     int rval = func(arg);
 
     //Call lwp_exit
-    lwp_exit(rval);
-}
-
-static void lwp_wrap(lwpfun fun, void *arg) {
-    /* Call the given lwpfunction with the given argument.
-    * Calls lwp exit() with its return value
-    */
-    int rval;
-    rval = fun(arg);
     lwp_exit(rval);
 }
 
@@ -97,7 +89,7 @@ tid_t lwp_create(lwpfun func, void *arg){
     }
 
     //Initialize thread's status
-    newThread -> status = MKTERMSTAT(LWP_LIVE, 0);
+    newThread -> status = MKTERMSTAT(LWP_LIVE, NO_EXIT_VALUE);
 
     /*set stack to new stack initialized*/
     newThread -> stack = stackPointer;
@@ -155,6 +147,11 @@ void  lwp_start(void){
 
     thread callingThread = (thread) malloc(sizeof(context));
 
+    //Return if malloc fails
+    if (callingThread == NULL){
+        return;
+    }
+
     /*set tid to the current counter value then increment the counter*/
     callingThread -> tid = ++threadCounter;
 
@@ -176,7 +173,7 @@ void  lwp_start(void){
     }
 
     //Initialize thread's status
-    callingThread -> status = LWP_LIVE;
+    callingThread -> status = MKTERMSTAT(LWP_LIVE, MKTERMSTAT(LWP_LIVE, NO_EXIT_VALUE));
 
     /*set stack to NULL*/
     callingThread -> stack = NULL;
@@ -187,42 +184,31 @@ void  lwp_start(void){
     /*set exited pointer to NULL*/
     callingThread -> exited = NULL;
 
+    /* admit into scheduler */
+    currentSched -> admit(callingThread);
 
     /*yeild to next thread*/
     lwp_yield();
     return;
 }
 
-// typedef struct threadinfo_st {
-//   rfile         state;          /* saved registers         */
-// } context;
-
+/*Yields control to another LWP.Which one depends on the
+scheduler. Saves the current LWP’s context, picks the 
+next one, restores that thread’s context, and returns.
+If there is no next thread, terminates the program*/
 void  lwp_yield(void){
-    ////printf"\nin yield");
-    /*Yields control to another LWP.Which one depends on the
-     scheduler. Saves the current LWP’s context, picks the 
-     next one, restores that thread’s context, and returns.
-     If there is no next thread, terminates the program*/
+    
 
     /*yield to LWP returned by lwp_get_scheduler()->next*/
-    /*TODO: set currentThread = next*/
 
     /*if no next thread exit(3) with termination status of LWP*/
     thread nextThread = lwp_get_scheduler()->next();
 
     //printf("got next\n");
     if(nextThread == NULL){
-        //printf("exiting1");
         exit(currentThread->status); //TODO exit with correct status
     }
-    //printf("not exiting");
-    /*yield to LWP returned by lwp_get_scheduler()->next*/
 
-    //printf("here0");
-    // //printf("swapping(%p and %p)"
-    // ,(&currentThread->state, &nextThread->state));
-    // exit(1);
-    swap_rfiles(NULL, NULL);
     rfile *old;
     rfile *new;
     if(currentThread == NULL || currentThread->stack == NULL){
@@ -236,9 +222,6 @@ void  lwp_yield(void){
         new = &nextThread->state;
     }
     swap_rfiles(old, new);
-    ////printf"rfiles swaped");
-    //printf("exited after swaprfiles");
-    // exit(1);
 
     currentThread = nextThread;
     return;
@@ -250,14 +233,12 @@ void  lwp_exit(int status){
     /*Terminates the current LWP and yields to whichever
      thread the scheduler chooses. lwpexit() does not return*/
 
-    scheduler sched = lwp_get_scheduler();
-
     /*remove current LWP*/
     /*remove current thread from scheduler*/
-    lwp_get_scheduler()->remove(currentThread);
+    currentSched->remove(currentThread);
     
     /*update status*/
-    currentThread->status = LWP_TERM;
+    currentThread->status = MKTERMSTAT(LWP_TERM, status);
     /*TODO: check if any threads are waiting*/
     if(exitedHead == NULL){
         struct threadinfo_st exitedHeadInit;
@@ -290,7 +271,7 @@ void  lwp_exit(int status){
     /*swap to the next LWP */
     lwp_yield();
     //TODO: currentContext =
-    thread nextThread = sched -> next();
+    thread nextThread = currentSched -> next();
     //swap exited lwp state with next State
     swap_rfiles(&currentThread->state, &nextThread->state);
 
