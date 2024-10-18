@@ -66,6 +66,7 @@ tid_t lwp_create(lwpfun func, void *arg){
             -1, 0);
     //error checking for mmap call
     if(stackPointer == MAP_FAILED){
+        free(newThread);
         return NO_THREAD; 
     }
 
@@ -96,7 +97,7 @@ tid_t lwp_create(lwpfun func, void *arg){
     }
 
     //Initialize thread's status
-    newThread -> status = LWP_LIVE;
+    newThread -> status = MKTERMSTAT(LWP_LIVE, 0);
 
     /*set stack to new stack initialized*/
     newThread -> stack = stackPointer;
@@ -107,32 +108,23 @@ tid_t lwp_create(lwpfun func, void *arg){
 
     /* set state to what it needs to be */
 
-    //Load argument into rdi register
-    newThread -> state.rdi = (unsigned long) arg;
 
     //Threads are never called, so 
     // RBP and return address are not needed
-    unsigned long topOfStack = 
-        ((unsigned long)(newThread -> stack) 
-        + (newThread -> stacksize));
-
-    //Ensure it is aligned by 16
-    topOfStack = ((topOfStack + 15) & -16);
+    //Ensure alignment
+    unsigned long *topOfStack = 
+        (unsigned long*) ((newThread -> stack) 
+        + (STACK_SIZE / sizeof (unsigned long)) - 1);
     
-    
-    //Put function as return address
-    unsigned long *topPointer = (unsigned long *)topOfStack;
-    topPointer--;
+    topOfStack[0] = (unsigned long) 70803;
 
-    *topPointer = (unsigned long)lwp_wrap;
+    topOfStack[-1] = (unsigned long)lwp_wrap;
 
-    //Put a filler old base pointer address
-    topPointer--;
-    *topPointer = 127;
+    topOfStack -= 2;
 
     //Set rbp and rsp
-    newThread -> state.rbp = topOfStack;
-    newThread -> state.rsp = topOfStack;
+    newThread -> state.rbp = (unsigned long) topOfStack;
+    // newThread -> state.rsp = (unsigned long) topOfStack;
     newThread -> state.rdi = (unsigned long) func;
     newThread -> state.rsi = (unsigned long) arg;
 
