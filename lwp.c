@@ -36,15 +36,6 @@ static void lwp_wrap(lwpfun func, void *arg){
     lwp_exit(rval);
 }
 
-static void lwp_wrap(lwpfun fun, void *arg) {
-    /* Call the given lwpfunction with the given argument.
-    * Calls lwp exit() with its return value
-    */
-    int rval;
-    rval = fun(arg);
-    lwp_exit(rval);
-}
-
 tid_t lwp_create(lwpfun func, void *arg){
     //Allocate memory for new context
     thread newThread = (thread) malloc(sizeof(context));
@@ -186,7 +177,7 @@ void  lwp_start(void){
 
     /*set exited pointer to NULL*/
     callingThread -> exited = NULL;
-
+    lwp_get_scheduler()->admit(callingThread);
 
     /*yeild to next thread*/
     lwp_yield();
