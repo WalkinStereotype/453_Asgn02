@@ -187,6 +187,7 @@ void  lwp_start(void){
     /* admit into scheduler */
     currentSched -> admit(callingThread);
 
+
     /*yeild to next thread*/
     lwp_yield();
     return;
